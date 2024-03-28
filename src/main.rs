@@ -19,32 +19,12 @@ fn dot(color: &str) -> Circle {
         .set("r", "0.25mm");
 }
 
-fn paint_grid(offset: (f32, f32), doc: Document, color: &str) -> Document {
-    let mut new_doc = doc;
-    let num_cells = (
-        ((PAPER_SIZE.0/2.0 - OUTTER_MARGINS.0 - INNER_MARGINS.0) / CELL_SIZE.0).ceil() as i32,
-        ((PAPER_SIZE.1/2.0 - OUTTER_MARGINS.1 - INNER_MARGINS.1) / CELL_SIZE.1).ceil() as i32
-    );
-
-    for x in 0..num_cells.0 {
-        for y in 0..num_cells.1 {
-            let loc = (
-                (x as f32) * CELL_SIZE.0 + offset.0, 
-                (y as f32) * CELL_SIZE.1 + offset.1
-            );
-            new_doc = new_doc.add(
-                dot(color)
-                    .set("cx", mm(loc.0))
-                    .set("cy", mm(loc.1))
-            );
-        }
-    }
-
+fn paint_header(offset: (f32, f32), num_cells: (usize, usize), document: Document, color: &str) -> Document {
     let right_box_width = 5.0;
     let mid_box_width = 2.0;
     let left_box_width = (num_cells.0 as f32) - right_box_width - mid_box_width - 1.0;
 
-    new_doc = new_doc.add(
+    return document.add(
         Rectangle::new() // Left Box
             .set("width", mm(CELL_SIZE.0 * left_box_width))
             .set("height", mm(CELL_SIZE.1))
@@ -72,7 +52,102 @@ fn paint_grid(offset: (f32, f32), doc: Document, color: &str) -> Document {
             .set("stroke-width", "0.25mm")
             .set("stroke", color)
     );
+}
+
+fn paint_grid(offset: (f32, f32), num_cells: (usize, usize), doc: Document, color: &str) -> Document {
+    let mut new_doc = doc;
+
+    for x in 0..num_cells.0 {
+        for y in 0..num_cells.1 {
+            let loc = (
+                (x as f32) * CELL_SIZE.0 + offset.0, 
+                (y as f32) * CELL_SIZE.1 + offset.1
+            );
+            new_doc = new_doc.add(
+                dot(color)
+                    .set("cx", mm(loc.0))
+                    .set("cy", mm(loc.1))
+            );
+        }
+    }
+
     return new_doc;
+}
+
+fn paint_default_page(offset: (f32, f32), document: Document, color: &str) -> Document {
+    let mut doc = document;
+
+    let num_cells = (
+        ((PAPER_SIZE.0/2.0 - OUTTER_MARGINS.0 - INNER_MARGINS.0) / CELL_SIZE.0).ceil() as usize,
+        ((PAPER_SIZE.1/2.0 - OUTTER_MARGINS.1 - INNER_MARGINS.1) / CELL_SIZE.1).ceil() as usize
+    );
+    doc = paint_grid(offset, num_cells, doc, color);
+    doc = paint_header(offset, num_cells, doc, color);
+    return doc;
+}
+
+fn paint_calendar(offset: (f32, f32), num_cells: (usize, usize), document: Document, color: &str) -> Document {
+    let mut doc = document;
+
+    let box_width = 2.0;
+    let days = vec!["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    let cell_offset = (CELL_SIZE.0 * (num_cells.0 - (2*days.len()) - 1) as f32 + offset.0, CELL_SIZE.1 * 3.0 + offset.1);
+    let rows = vec!["Art", "Brush Teeth", "Chores", "Dread", "Entropy", "Flee", "Grand", "Immediate"];
+
+    // doc = doc.add(
+    //     Script::new(format!(".text {{ font: {}; }}", color))
+    // );
+
+    
+    for (c, day) in days.iter().enumerate() {
+        doc = doc.add(
+            Text::new(day.to_string())
+                .set("x", mm(cell_offset.0 + CELL_SIZE.0 * box_width * (c as f32)))
+                .set("y", mm(cell_offset.1 - 1.0))
+                .set("style", format!("fill: {}; font-weight: lighter; font-size: 14px;", color))
+        );
+        
+    }
+
+    for (r, row) in rows.iter().enumerate() {
+        doc = doc.add(
+            Text::new(row.to_string())
+                .set("x", mm(offset.0))
+                .set("y", mm(cell_offset.1 + CELL_SIZE.1 * ((r + 1) as f32) - 1.0))
+                .set("style", format!("fill: {}; font-weight: lighter; font-size: 14px;", color))
+        );
+        for (c, day) in days.iter().enumerate() {
+            doc = doc.add(
+                Rectangle::new()
+                    .set("width", mm(box_width * CELL_SIZE.0))
+                    .set("height", mm(CELL_SIZE.1))
+                    .set("x", mm(cell_offset.0 + CELL_SIZE.0 * box_width * (c as f32)))
+                    .set("y", mm(cell_offset.1 + CELL_SIZE.1 * (r as f32)))
+                    .set("fill", "none")
+                    .set("stroke-width", "0.25mm")
+                    .set("stroke", color)
+            );
+        }
+    }
+
+    return doc;
+}
+
+fn paint_calendar_page(offset: (f32, f32), document: Document, color: &str) -> Document {
+    let mut doc = document;
+
+    let num_cells = (
+        ((PAPER_SIZE.0/2.0 - OUTTER_MARGINS.0 - INNER_MARGINS.0) / CELL_SIZE.0).ceil() as usize,
+        ((PAPER_SIZE.1/2.0 - OUTTER_MARGINS.1 - INNER_MARGINS.1) / CELL_SIZE.1).ceil() as usize
+    );
+
+    doc = paint_grid(offset, num_cells, doc, color);
+    doc = paint_header(offset, num_cells, doc, color);
+    doc = paint_calendar(offset, num_cells, doc, color);
+
+
+
+    return doc;
 }
 
 fn save_page(color: &str, file_name: &str) {
@@ -80,10 +155,10 @@ fn save_page(color: &str, file_name: &str) {
     let mut document = Document::new()
         .set("viewBox", (0, 0, mm(PAPER_SIZE.0), mm(PAPER_SIZE.1)));
 
-    document = paint_grid(OUTTER_MARGINS, document, color);
-    document = paint_grid((PAPER_SIZE.0/2.0 + INNER_MARGINS.0+2.0,OUTTER_MARGINS.1), document, color);
-    document = paint_grid((OUTTER_MARGINS.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), document, color);
-    document = paint_grid((PAPER_SIZE.0/2.0 + INNER_MARGINS.0+2.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), document, color);
+    document = paint_calendar_page(OUTTER_MARGINS, document, color);
+    document = paint_calendar_page((PAPER_SIZE.0/2.0 + INNER_MARGINS.0+2.0,OUTTER_MARGINS.1), document, color);
+    document = paint_calendar_page((OUTTER_MARGINS.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), document, color);
+    document = paint_calendar_page((PAPER_SIZE.0/2.0 + INNER_MARGINS.0+2.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), document, color);
 
     document = document.add(
         Line::new() // Left Vert Line
