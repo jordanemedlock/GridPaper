@@ -25,15 +25,31 @@ struct GridSettings<'a> {
     num_cells: (usize, usize)
 }
 
+struct CalendarSettings<'a> {
+    columns: Vec<&'a str>,
+    rows: Vec<&'a str>
+}
+
+struct TextSettings<'a> {
+    text: &'a str,
+    grid_loc: (i32, i32)
+}
+
+
 trait GridPaper {
     fn header(self, grid_settings: &GridSettings) -> Self;
     fn grid(self, grid_settings: &GridSettings) -> Self;
-    fn default_page(self, offset: (f32, f32), color: &str) -> Self;
-    fn calendar(self, grid_settings: &GridSettings) -> Self;
-    fn calendar_page(self, offset: (f32, f32), color: &str) -> Self;
+    fn calendar(self, grid_settings: &GridSettings, calendar_settings: &CalendarSettings) -> Self;
+
     fn cut_lines(self, color: &str) -> Self;
-    fn full_calendar_page(self, color: &str) -> Self;
+    
+    fn default_page(self, offset: (f32, f32), color: &str) -> Self;
+    fn goals_page(self, offset: (f32, f32), color: &str) -> Self;
+    fn calendar_page(self, offset: (f32, f32), color: &str, calendar_settings: &CalendarSettings) -> Self;
+
+    fn full_calendar_page(self, color: &str, calendar_settings: &CalendarSettings) -> Self;
     fn full_default_page(self, color: &str) -> Self;
+    fn full_goals_page(self, color: &str) -> Self;
 }
 
 impl GridPaper for SVG {
@@ -106,19 +122,18 @@ impl GridPaper for SVG {
             .header(&grid_settings)
     }
 
-    fn calendar(self, grid_settings: &GridSettings) -> Self {
+    fn calendar(self, grid_settings: &GridSettings, calendar_settings: &CalendarSettings) -> Self {
         let mut doc = self;
 
         let box_width = 2.0;
-        let days = vec!["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+        let days = &calendar_settings.columns;
         let start_cell = (
             CELL_SIZE.0 * (grid_settings.num_cells.0 - (2*days.len()) - 1) as f32 + grid_settings.offset.0, 
             CELL_SIZE.1 * 3.0 + grid_settings.offset.1
         );
-        let rows = vec![
-            "Art", "Brush Teeth", "Chores", "Dread", "Entropy", "Flee", 
-            "Grand", "Immediate", "", "", "", "", ""
-        ];
+
+
+        let rows = &calendar_settings.rows;
         
         for (c, day) in days.iter().enumerate() {
             doc = doc.add(
@@ -154,7 +169,7 @@ impl GridPaper for SVG {
         return doc;
     }
 
-    fn calendar_page(self, offset: (f32, f32), color: &str) -> Self {
+    fn calendar_page(self, offset: (f32, f32), color: &str, calendar_settings: &CalendarSettings) -> Self {
         let num_cells = (
             ((PAPER_SIZE.0/2.0 - OUTTER_MARGINS.0 - INNER_MARGINS.0) / CELL_SIZE.0).ceil() as usize,
             ((PAPER_SIZE.1/2.0 - OUTTER_MARGINS.1 - INNER_MARGINS.1) / CELL_SIZE.1).ceil() as usize
@@ -166,7 +181,7 @@ impl GridPaper for SVG {
 
         self.grid(&grid_settings)
             .header(&grid_settings)
-            .calendar(&grid_settings)
+            .calendar(&grid_settings, calendar_settings)
     }
 
     fn cut_lines(self, color: &str) -> Self {
@@ -197,11 +212,11 @@ impl GridPaper for SVG {
         )
     }
 
-    fn full_calendar_page(self, color: &str) -> Self {
-        self.calendar_page(OUTTER_MARGINS, color)
-            .calendar_page((PAPER_SIZE.0/2.0 + INNER_MARGINS.0 + MID_SPLIT_WIDTH/2.0, OUTTER_MARGINS.1), color)
-            .calendar_page((OUTTER_MARGINS.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), color)
-            .calendar_page((PAPER_SIZE.0/2.0 + INNER_MARGINS.0 + MID_SPLIT_WIDTH/2.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), color)
+    fn full_calendar_page(self, color: &str, calendar_settings: &CalendarSettings) -> Self {
+        self.calendar_page(OUTTER_MARGINS, color, calendar_settings)
+            .calendar_page((PAPER_SIZE.0/2.0 + INNER_MARGINS.0 + MID_SPLIT_WIDTH/2.0, OUTTER_MARGINS.1), color, calendar_settings)
+            .calendar_page((OUTTER_MARGINS.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), color, calendar_settings)
+            .calendar_page((PAPER_SIZE.0/2.0 + INNER_MARGINS.0 + MID_SPLIT_WIDTH/2.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), color, calendar_settings)
             .cut_lines(color)
     }
 
@@ -212,13 +227,82 @@ impl GridPaper for SVG {
             .default_page((PAPER_SIZE.0/2.0 + INNER_MARGINS.0 + MID_SPLIT_WIDTH/2.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), color)
             .cut_lines(color)
     }
+
+    fn goals_page(self, offset: (f32, f32), color: &str) -> Self {
+        let questions = vec![
+            TextSettings { text: "Goal:", grid_loc: (0, 1) },
+            TextSettings { text: "Values underlying my goal:", grid_loc: (0,2) },
+            TextSettings { text: "Actions to take to acheive that goal:", grid_loc: (0, 4) },
+            TextSettings { text: "The * I'm willing to make room for:", grid_loc: (0, 8) },
+            TextSettings { text: "Thoughts/memories:", grid_loc: (0, 9) },
+            TextSettings { text: "Feelings:", grid_loc: (0, 11) },
+            TextSettings { text: "Sensations/Urges:", grid_loc: (0, 13) },
+            TextSettings { text: "It would be useful to remind myself:", grid_loc: (0, 15) },
+            TextSettings { text: "Smaller steps to acheive goal:", grid_loc: (0, 18) },
+            TextSettings { text: "Smallest step to begin with:", grid_loc: (0, 22) },
+            TextSettings { text: "Datetime to take that first step:", grid_loc: (0, 24) },
+        ];
+
+        let mut new_doc = self.default_page(offset, color);
+
+        for TextSettings { text, grid_loc} in questions {
+            new_doc = new_doc.add(
+                Text::new(text)
+                .set("x", mm(offset.0 + CELL_SIZE.0 * grid_loc.0 as f32))
+                .set("y", mm(offset.1 + CELL_SIZE.1 * grid_loc.1 as f32 - 1.5))
+                .set("style", format!("fill: {}; font-size: 14px;", color))
+            );
+        }
+
+        return new_doc;
+    }
+
+
+    fn full_goals_page(self, color: &str) -> Self {
+        self.goals_page(OUTTER_MARGINS, color)
+            .goals_page((PAPER_SIZE.0/2.0 + INNER_MARGINS.0 + MID_SPLIT_WIDTH/2.0, OUTTER_MARGINS.1), color)
+            .goals_page((OUTTER_MARGINS.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), color)
+            .goals_page((PAPER_SIZE.0/2.0 + INNER_MARGINS.0 + MID_SPLIT_WIDTH/2.0,PAPER_SIZE.1/2.0 + OUTTER_MARGINS.1), color)
+            .cut_lines(color)
+    }
 }
 
 
 fn main() {
+
+    let empty_calendar = CalendarSettings {
+        rows: vec!["", "", "", "", "", "", "", "", "", ""], 
+        columns: vec!["Mon", "Tue", "Wed", "Thu", "Fri"]
+    };
+    let abcde_calendar = CalendarSettings {
+        rows: vec!["Art", "Brush Teeth", "Chores", "Dread", "Entropy", "Flee", "Grand", "Heart", "Immediate", "", "", "", ""], 
+        columns: vec!["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    };
+
     svg::save("grid_paper_red.svg", &Document::new().full_default_page("red"))
-        .and(svg::save("grid_paper_green.svg", &Document::new().full_default_page("green")))
-        .and(svg::save("grid_paper_blue.svg", &Document::new().full_default_page("blue")))
-        .and(svg::save("calendar_blue.svg", &Document::new().full_calendar_page("blue")))
+        .and(svg::save(
+            "grid_paper_green.svg", 
+            &Document::new().full_default_page("green")))
+        .and(svg::save(
+            "grid_paper_blue.svg",
+            &Document::new().full_default_page("blue")))
+        .and(svg::save(
+            "empty_calendar_red.svg", 
+            &Document::new().full_calendar_page("red", &empty_calendar)))
+        .and(svg::save(
+            "empty_calendar_blue.svg", 
+            &Document::new().full_calendar_page("blue", &empty_calendar)))
+        .and(svg::save(
+            "abcde_calendar_green.svg", 
+            &Document::new().full_calendar_page("green", &abcde_calendar)))
+        .and(svg::save(
+            "goals_green.svg",
+            &Document::new().full_goals_page("green")))
+        .and(svg::save(
+            "goals_red.svg",
+            &Document::new().full_goals_page("red")))
+        .and(svg::save(
+            "goals_blue.svg",
+            &Document::new().full_goals_page("blue")))
         .expect("Files save correctly");
 }
