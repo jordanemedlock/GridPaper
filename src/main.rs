@@ -279,30 +279,20 @@ fn main() {
         columns: vec!["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     };
 
-    svg::save("grid_paper_red.svg", &Document::new().full_default_page("red"))
-        .and(svg::save(
-            "grid_paper_green.svg", 
-            &Document::new().full_default_page("green")))
-        .and(svg::save(
-            "grid_paper_blue.svg",
-            &Document::new().full_default_page("blue")))
-        .and(svg::save(
-            "empty_calendar_red.svg", 
-            &Document::new().full_calendar_page("red", &empty_calendar)))
-        .and(svg::save(
-            "empty_calendar_blue.svg", 
-            &Document::new().full_calendar_page("blue", &empty_calendar)))
-        .and(svg::save(
-            "abcde_calendar_green.svg", 
-            &Document::new().full_calendar_page("green", &abcde_calendar)))
-        .and(svg::save(
-            "goals_green.svg",
-            &Document::new().full_goals_page("green")))
-        .and(svg::save(
-            "goals_red.svg",
-            &Document::new().full_goals_page("red")))
-        .and(svg::save(
-            "goals_blue.svg",
-            &Document::new().full_goals_page("blue")))
-        .expect("Files save correctly");
+
+    for color in ["red", "green", "blue", "black"] {
+        svg::save(
+                format!("output/grid_paper_{color}.svg"), 
+                &Document::new().full_default_page(color))
+            .and(svg::save(
+                format!("output/empty_calendar_{color}.svg"), 
+                &Document::new().full_calendar_page(color, &empty_calendar)))
+            .and(svg::save(
+                format!("output/abcde_calendar_{color}.svg"), 
+                &Document::new().full_calendar_page(color, &abcde_calendar)))
+            .and(svg::save(
+                format!("output/goals_{color}.svg"), 
+                &Document::new().full_goals_page(color)))
+            .expect(format!("{color} files saved correctly").as_str());
+    }
 }
